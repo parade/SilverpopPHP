@@ -597,8 +597,187 @@ class EngagePod {
 
     }
 
+	public function createContactList( $databaseId, $listName, $isPrivate = true, $parentFolderId = null, $parentFolderPath = null ) {
+                $data[ "Envelope" ] = array(
+                        "Body" => array(
+                                "CreateContactList" => array(
+                                        "DATABASE_ID" => $databaseId,
+                                        "CONTACT_LIST_NAME" => $listName,
+                                        "VISIBILITY" => ($isPrivate ? '0' : '1'),
+                                        "PARENT_FOLDER_ID" => $parentFolderId,
+                                        "PARENT_FOLDER_PATH" => $parentFolderPath
+                                )
+                        )
+                );
+                $response = $this->_request($data);
+                $result = $this->_getResult( $response );
+                if ( $this->_isSuccess( $result ) ) {
+                        if ( isset( $result['CONTACT_LIST_ID'] ) ) {
+                                return $result['CONTACT_LIST_ID'];
+                        } else {
+                                return ''; //?
+                        }
+                } else {
+                        throw new \Exception("CreateContactList Error: ".$this->_getErrorFromResponse($response));
+                }
+        }
+
+	public function selectContactDetails( $listId, $email ) {
+                $data[ "Envelope" ] = array(
+                        "Body" => array(
+                                "SelectRecipientData" => array(
+                                        "LIST_ID" => $listId,
+                                        "EMAIL" => $email
+                                )
+                        )
+                );
+                $response = $this->_request($data);
+                $result = $this->_getResult( $response );
+                if ( $this->_isSuccess( $result ) ) {
+                        if ( isset( $result['EMAIL'] ) ) {
+                                unset( $result[ 'SUCCESS' ] );
+                                return $result;
+                        } else {
+                                return array(); //?
+                        }
+                } else {
+                        throw new \Exception("SelectContactDetails Error: ".$this->_getErrorFromResponse($response));
+                }
+        }
+
+	public function addContactToContactList( $contactListId, $contactId ) {
+                $data["Envelope"] = array(
+                        "Body" => array(
+                                "AddContactToContactList" => array(
+                                        "CONTACT_LIST_ID" => $contactListId,
+                                        "CONTACT_ID" => $contactId
+                                )
+                        )
+                );
+                $response = $this->_request($data);
+                $result = $this->_getResult( $response );
+                if ( $this->_isSuccess( $result ) ) {
+                        return true;
+                } else {
+                        throw new \Exception("AddContactToContactList Error: {$this->_getErrorFromResponse( $response )}");
+                }
+        }
+
+	/*not working unfortunatelly*/
+        public function previewMailing( $mailingId, $recipientEmail = null ) {
+                $data["Envelope"] = array(
+                        "Body" => array(
+                                "PreviewMailing" => array(
+                                        "MailingId" => $mailingId,
+                                        "RecipientEmail" => $recipientEmail
+                                )
+                        )
+                );
+                $response = $this->_request($data);
+                $result = $this->_getResult( $response );
+                if ( $this->_isSuccess( $result ) ) {
+                        return $result;
+                } else {
+                        throw new \Exception( "PreviewMailing Error: {$this->_getErrorFromResponse( $response )}" );
+                }
+        }
+
+	public function previewHtmlMailing( $mailingId, $recipientEmail = null, $substitutions = array() ) {
+                $mailing_preview = $this->previewMailing( $mailingId, $recipientEmail );
+                if ( true === empty( $substitutions ) ) {
+                        return $mailing_preview[ 'HTMLBody' ];
+                }
+                $html = $mailing_preview[ 'HTMLBody' ];
+                foreach( $substitutions as $name => $value ) {
+                        $html = str_replace( "%%{$name}%%", $value, $html );
+                }
+                return $html;
+        }
+
+	public function listDCRulesetsForMailing( $mailingId ) {
+                $data["Envelope"] = array(
+                        "Body" => array(
+                                "ListDCRulesetsForMailing" => array(
+                                        "MAILING_ID" => $mailingId,
+                                )
+                        )
+                );
+                $response = $this->_request($data);
+                $result = $this->_getResult( $response );
+                if ( $this->_isSuccess( $result ) ) {
+                        return $result['RULESET'];
+                } else {
+                        throw new \Exception( "PreviewMailing Error: {$this->_getErrorFromResponse( $response )}" );
+                }
+        }
+
+	public function saveTemplate( $options ) {
+                $defaults = array(
+                        'mailingName' => null,
+                        'mailingId' => null,
+                        'subject' => null,
+                        'listId' => null,
+                        'fromName' => null,
+                        'fromAddress' => null,
+                        'replyTo' => null,
+                        'visibility' => 0,
+                        'folderPath' => null,
+                        'encoding' => 6,
+                        'trackingLevel' => 4,
+                        'clickHereMessage' => 'TRUE', //undocumented
+                        'isCrmTemplate' => null,
+                        'hasSpCrmBlock' => null,
+                        'personalFromName' => null,
+                        'personalFromAddress' => null,
+                        'personalReplyTo' => null,
+                        'htmlBody' => null,
+                        'clickThroughs' => array()
+                );
+                $args = array_merge( $defaults, $options );
+                extract( $args );
+                $data["Envelope"] = array(
+                        "Body" => array(
+                                "SaveMailing" => array(
+                                        "Header" => array(
+						"MailingName" => $mailingName,
+                                                "MailingID" => $mailingId,
+                                                "Subject" => $subject,
+                                                "ListID" => $listId,
+                                                "FromName" => $fromName,
+                                                "FromAddress" => $fromAddress,
+                                                "ReplyTo" => $replyTo,
+                                                "Visibility" => $visibility,
+                                                "FolderPath" => $folderPath,
+                                                "Encoding" => $encoding,
+                                                "TrackingLevel" => $trackingLevel,
+                                                "ClickHereMessage" => $clickHereMessage,
+                                                "IsCrmTemplate" => $isCrmTemplate,
+                                                "HasSpCrmBlock" => $hasSpCrmBlock,
+                                                "PersonalFromName" => $personalFromName,
+                                                "PersonalFromAddress" => $personalFromAddress,
+                                                "PersonalReplyTo" => $personalReplyTo
+                                        ),
+                                        "MessageBodies" => array(
+                                                "HTMLBody" => $htmlBody
+                                        ),
+                                        "ClickThroughs" => array( array( "ClickThrough" => $clickThroughs ) ),
+                                        "ForwardToFriend" => array(
+                                                "ForwardType" => 0
+                                        )
+                                )
+                        )
+                );
+                $response = $this->_request($data);
+                $result = $this->_getResult( $response );
+                if ( $this->_isSuccess( $result ) ) {
+                        return $result['MailingID'];
+                } else {
+                        throw new \Exception( "SaveMailing Error: {$this->_getErrorFromResponse( $response )}" );
+                }
+        }
+
     /**
-     * Private method: authenticate with Silverpop
+     * Protected method: authenticate with Silverpop
      *
      */
     protected function _login($username, $password) {
@@ -611,7 +790,7 @@ class EngagePod {
             ),
         );
         $response = $this->_request($data);
-        $result = $response["Envelope"]["Body"]["RESULT"];
+        $result = $this->_getResult( $response );
         if ($this->_isSuccess($result)) {
             $this->_jsessionid = $result['SESSIONID'];
             $this->_session_encoding = $result['SESSION_ENCODING'];
@@ -623,15 +802,46 @@ class EngagePod {
     }
 
     /**
-     * Private method: generate the full request url
+     * Protected method: generate the full request url
      *
      */
     protected function _getFullUrl() {
         return $this->_baseUrl . (isset($this->_session_encoding) ? $this->_session_encoding : '');
     }
 
+    protected function _getResult( $response ) {
+        return $response["Envelope"]["Body"]["RESULT"];
+    }
+
     /**
-     * Private method: make the request
+     * Protected method: post the request to the url
+     *
+     */
+    protected function _httpPost($fields) {
+        $fields_string = http_build_query($fields);
+        //open connection
+        $ch = curl_init();
+
+        //set the url, number of POST vars, POST data
+        curl_setopt($ch,CURLOPT_URL,$this->_getFullUrl());
+        curl_setopt($ch,CURLOPT_POST,count($fields));
+        curl_setopt($ch,CURLOPT_POSTFIELDS,$fields_string);
+        curl_setopt($ch,CURLOPT_RETURNTRANSFER,true);
+        curl_setopt($ch,CURLOPT_HTTPHEADER,array(
+            'Content-Type: application/x-www-form-urlencoded; charset=utf-8'
+        ));
+
+        //execute post
+        $result = curl_exec($ch);
+
+        //close connection
+        curl_close($ch);
+
+        return $result;
+    }
+
+    /**
+     * Protected method: make the request
      *
      */
     protected function _request($data, $replace = array(), $attribs = array()) {
@@ -666,31 +876,7 @@ class EngagePod {
     }
 
     /**
-     * Private method: post the request to the url
-     *
-     */
-    protected function _httpPost($fields) {
-        $fields_string = http_build_query($fields);
-        //open connection
-        $ch = curl_init();
-
-        //set the url, number of POST vars, POST data
-        curl_setopt($ch,CURLOPT_URL,$this->_getFullUrl());
-        curl_setopt($ch,CURLOPT_POST,count($fields));
-        curl_setopt($ch,CURLOPT_POSTFIELDS,$fields_string);
-        curl_setopt($ch,CURLOPT_RETURNTRANSFER,true);
-
-        //execute post
-        $result = curl_exec($ch);
-
-        //close connection
-        curl_close($ch);
-
-        return $result;
-    }
-
-    /**
-     * Private method: parse an error response from Silverpop
+     * Protected method: parse an error response from Silverpop
      *
      */
     protected function _getErrorFromResponse($response) {
@@ -701,7 +887,7 @@ class EngagePod {
     }
 
     /**
-     * Private method: determine whether a request was successful
+     * Protected method: determine whether a request was successful
      *
      */
     protected function _isSuccess($result) {
